@@ -11,10 +11,10 @@ require([
   "css!diff2html-css",
   "css!highlightjs-style-github-min",
   "css!app-css"
-], function (angular, Diff2Html, diff) {
+], function(angular, Diff2Html, diff) {
 
   angular.module("myApp", ["hljs"])
-    .controller("OrgController", function ($scope, $http, $sce) {
+    .controller("OrgController", function($scope, $http, $sce) {
 
       $http.defaults.headers.common["X-ENCRYPTED-OWNER-ID"] = window.encOwnerId;
 
@@ -125,7 +125,7 @@ require([
           });
       };
 
-      $scope.fetchOrgData = function (id, callback) {
+      $scope.fetchOrgData = function(id, callback) {
         $http
           .get("/orgs/" + id + "/metadata")
           .success(function(data, status, headers, config) {
@@ -137,8 +137,7 @@ require([
           });
       };
 
-      $scope.selectOrg = function (org) {
-
+      $scope.selectOrg = function(org) {
         var id = org.id;
 
         var i = $scope.selectedOrgs.indexOf(id);
@@ -161,16 +160,26 @@ require([
           $scope.leftOrgData = org;
           $scope.rightOrgData = {};
           $scope.diffData = {};
-          $scope.fetchOrgData($scope.selectedOrgs[0], function (data) {
+          $scope.fetchOrgData($scope.selectedOrgs[0], function(data) {
             $scope.leftOrgData = data;
           });
         }
         else if ($scope.selectedOrgs.length == 2) {
           $scope.rightOrgData = org;
-          $scope.fetchOrgData($scope.selectedOrgs[1], function (data) {
+          $scope.fetchOrgData($scope.selectedOrgs[1], function(data) {
             $scope.rightOrgData = data;
           });
         }
+      };
+
+      $scope.flipSelected = function() {
+        var left = $scope.selectedOrgs[0];
+        $scope.selectedOrgs[0] = $scope.selectedOrgs[1];
+        $scope.selectedOrgs[1] = left;
+
+        var leftData = $scope.leftOrgData;
+        $scope.leftOrgData = $scope.rightOrgData;
+        $scope.rightOrgData = leftData;
       };
 
       $scope.getActionLabel = function(apexClass) {
@@ -216,7 +225,7 @@ require([
           .post(url, { apexClasses: apexClasses })
           .success(function(data, status, headers, config) {
             $scope.diffData = {};
-            $scope.fetchOrgData($scope.selectedOrgs[0], function (data) {
+            $scope.fetchOrgData($scope.selectedOrgs[0], function(data) {
               $scope.leftOrgData = data;
             });
           })
