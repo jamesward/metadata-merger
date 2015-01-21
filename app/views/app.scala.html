@@ -80,7 +80,7 @@
                     </div>
                     <div class="panel panel-default" ng-if="selectedOrgs.length == 1">
                         <div class="panel-heading">
-                            {{leftOrgData.name}}
+                            {{leftOrgData.name}} {{leftOrgData.owner_name}}
                             <div style="position: absolute; top: 5px; right: 20px;">
                                 <a class="btn btn-default btn-sm" target="_blank" ng-href="{{leftOrgData.login_url + '&retURL=/setup/forcecomHomepage.apexp'}}">
                                     <span class="glyphicon glyphicon-cog"></span>
@@ -122,14 +122,14 @@
                             <div class="col-md-6 no-side-padding">
                                 <div class="panel panel-default">
                                     <div class="panel-heading text-center">
-                                        Merge To: {{leftOrgData.name}}
+                                        Merge To: {{leftOrgData.name}} {{leftOrgData.owner_name}}
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6 no-side-padding">
                                 <div class="panel panel-default">
                                     <div class="panel-heading text-center">
-                                        Merge From: {{rightOrgData.name}}
+                                        Merge From: {{rightOrgData.name}} {{rightOrgData.owner_name}}
                                     </div>
                                 </div>
                             </div>
