@@ -8,8 +8,8 @@ import play.api.libs.json.{JsValue, Json, JsObject, JsPath}
 import play.api.mvc.Results.EmptyContent
 
 import play.api.mvc._
-import scalikejdbc.async.AsyncDB
-import utils.{UnauthorizedError, ForceUtil}
+import scalikejdbc.async.{AsyncDBSession, AsyncDB}
+import utils.{AuthInfo, UnauthorizedError, ForceUtil}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -122,6 +122,23 @@ object Application extends Controller {
   // the ownerId is encrypted so that it can't be overwritten
   def oauthCallback(code: String, maybeEncOwnerId: Option[String]) = Action.async { implicit request =>
 
+    def createOrg(authInfo: AuthInfo, orgId: String, username: String, userId: String, ownerId: String, salesforceUserFuture: Future[SalesforceUser])(implicit session: AsyncDBSession): Future[SalesforceUser] = {
+      forceUtil.orgInfo(authInfo, orgId).flatMap { orgInfo =>
+        val name = (orgInfo \ "Name").as[String]
+        val edition = (orgInfo \ "OrganizationType").as[String]
+
+        // add the org
+        println(orgId, name, username, edition, authInfo.accessToken, authInfo.refreshToken, authInfo.instanceUrl, ownerId)
+        Org.create(orgId, name, username, edition, authInfo.accessToken, authInfo.refreshToken, authInfo.instanceUrl, ownerId).flatMap { _ =>
+          // if the SalesforceUser can't be found then create one
+          salesforceUserFuture.recoverWith {
+            case e: SalesforceUserNotFound =>
+              SalesforceUser.create(userId, ownerId)
+          }
+        }
+      }
+    }
+
     val loginFuture = forceUtil.login(code)
 
     loginFuture.flatMap { authInfo =>
@@ -146,26 +163,14 @@ object Application extends Controller {
               AsyncDB.localTx { implicit tx =>
                 for {
                   owner <- Owner.create
-                  salesforceUser <- SalesforceUser.create(userId, owner.id)
+                  salesforceUser <- createOrg(authInfo, orgId, username, userId, owner.id, salesforceUserFuture)
                 } yield salesforceUser
               }
           }
         } { encOwnerId =>
           // add org
           val ownerId = Crypto.decryptAES(encOwnerId)
-          forceUtil.orgInfo(authInfo, orgId).flatMap { orgInfo =>
-            val name = (orgInfo \ "Name").as[String]
-            val edition = (orgInfo \ "OrganizationType").as[String]
-
-            // add the org
-            Org.create(orgId, name, username, edition, authInfo.accessToken, authInfo.refreshToken, authInfo.instanceUrl, ownerId).flatMap { _ =>
-              // if the SalesforceUser can't be found then create one
-              salesforceUserFuture.recoverWith {
-                case e: SalesforceUserNotFound =>
-                  SalesforceUser.create(userId, ownerId)
-              }
-            }
-          }
+          createOrg(authInfo, orgId, username, userId, ownerId, salesforceUserFuture)(AsyncDB.sharedSession)
         }
       }
     } map { salesforceUser =>
