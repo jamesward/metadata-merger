@@ -1,0 +1,23 @@
+DROP TABLE IF EXISTS owner;
+CREATE TABLE owner (
+  id VARCHAR(1024) PRIMARY KEY
+);
+
+DROP TABLE IF EXISTS salesforce_user;
+CREATE TABLE salesforce_user (
+  user_id VARCHAR(1024) PRIMARY KEY,
+  owner_id VARCHAR(1024) REFERENCES owner(id) NOT NULL
+);
+
+DROP TABLE IF EXISTS org;
+CREATE TABLE org (
+  id SERIAL PRIMARY KEY,
+  sf_id VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  owner_name VARCHAR(255) NOT NULL,
+  edition VARCHAR(255) NOT NULL,
+  access_token VARCHAR(1024) NOT NULL,
+  refresh_token VARCHAR(1024) NOT NULL,
+  instance_url VARCHAR(1024) NOT NULL,
+  owner_id VARCHAR(1024) REFERENCES owner(id) NOT NULL
+);

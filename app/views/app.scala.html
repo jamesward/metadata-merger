@@ -1,0 +1,166 @@
+@(addOrgUrl: String, encOwnerId: String)
+<!DOCTYPE html>
+<html lang="en" ng-app="myApp">
+    <head>
+        <title>Salesforce Metadata Merger</title>
+        <link rel="shortcut icon" type="image/png" href="@routes.Assets.versioned("images/favicon.png")">
+        <link rel="stylesheet" href="@routes.Assets.versioned("stylesheets/ng-cloak.css")">
+        <script>
+        var require = {
+            callback: function() {
+            // default requirejs configs
+                @play.api.Play.current.configuration.getString("assets.url").fold {
+                    @for(webJarJson <- org.webjars.RequireJS.getSetupJson(StaticWebJarAssets.url("")).values()) {
+                        requirejs.config(@Html(webJarJson.toString));
+                    }
+                } { assetsUrl =>
+                    @for(webJarJson <- org.webjars.RequireJS.getSetupJson(StaticWebJarAssets.url(""), routes.WebJarAssets.at("").url).values()) {
+                        requirejs.config(@Html(webJarJson.toString));
+                    }
+                }
+
+                requirejs.config({
+                    "paths": {
+                        "app-css": "@routes.Assets.versioned("stylesheets/app")"
+                    },
+                    "shim": {
+                        "app-css": ["bootstrap-css"],
+                        "angular": {
+                            "exports" : "angular",
+                            "deps": ["jquery"]
+                        }
+                    }
+                });
+            }
+        };
+
+        var encOwnerId = "@encOwnerId";
+        </script>
+        <script data-main="@routes.Assets.versioned("javascripts/app.js")" src="@StaticWebJarAssets.url(WebJarAssets.locate("require.min.js"))"></script>
+    </head>
+    <body class="ng-cloak">
+        <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="#">Salesforce Metadata Merger</a>
+                </div>
+                <a href="@routes.Application.login()" class="btn btn-default navbar-btn navbar-right">Logout</a>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row" ng-controller="OrgController">
+                <div class="col-md-3">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            <h3 class="panel-title">Your Orgs</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="list-group">
+                                <a href="" class="list-group-item" ng-repeat="org in orgs" ng-click="selectOrg(org)" ng-class="{active: selectedOrgs.indexOf(org.id) >= 0}">
+                                    <h4 class="list-group-item-heading">{{org.name}}</h4>
+                                    <p class="list-group-item-text">{{org.owner_name}}</p>
+                                    <p class="list-group-item-text">{{org.edition}}</p>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="panel-footer text-center">
+                            <a href="@addOrgUrl" class="btn btn-primary">
+                                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                                Add Org
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-9">
+                    <div class="panel panel-default" ng-if="selectedOrgs.length == 0">
+                        <div class="panel-body">
+                            Select two orgs to diff, merge, and send pull requests
+                        </div>
+                    </div>
+                    <div class="panel panel-default" ng-if="selectedOrgs.length == 1">
+                        <div class="panel-heading">
+                            {{leftOrgData.name}}
+                            <div style="position: absolute; top: 5px; right: 20px;">
+                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{leftOrgData.login_url + '&retURL=/setup/forcecomHomepage.apexp'}}">
+                                    <span class="glyphicon glyphicon-cog"></span>
+                                    Setup
+                                </a>
+                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{leftOrgData.login_url + '&retURL=/_ui/common/apex/debug/ApexCSIPage'}}">
+                                    <span class="glyphicon glyphicon-wrench"></span>
+                                    Dev Console
+                                </a>
+                                @*
+                                <button class="btn btn-default btn-sm disabled">
+                                    <span class="glyphicon glyphicon-plus"></span>
+                                    Fork
+                                </button>
+                                <button class="btn btn-default btn-sm disabled">
+                                    <span class="glyphicon glyphicon-refresh"></span>
+                                    Sync to GitHub
+                                </button>
+                                *@
+                            </div>
+                        </div>
+                        <ul class="list-group">
+                            <li class="list-group-item">
+                                <div>
+                                    <h4 style="display: inline-block">Apex Classes</h4>
+
+                                </div>
+                                <ul class="list-group">
+                                    <li class="list-group-item" ng-repeat="apexclass in leftOrgData.apexclasses">
+                                        <h5>{{apexclass.Name}}</h5>
+                                        <div hljs source="apexclass.Body"></div>
+                                    </li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                    <div ng-if="selectedOrgs.length == 2">
+                        <div class="row">
+                            <div class="col-md-6 no-side-padding">
+                                <div class="panel panel-default">
+                                    <div class="panel-heading text-center">
+                                        Merge To: {{leftOrgData.name}}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 no-side-padding">
+                                <div class="panel panel-default">
+                                    <div class="panel-heading text-center">
+                                        Merge From: {{rightOrgData.name}}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <ul class="list-group">
+                                <li class="list-group-item">
+                                    <div style="padding-bottom: 10px">
+                                        <h4 style="position: absolute">Apex Classes</h4>
+                                        <button class="btn btn-default btn-sm center-block" ng-show="mergeAll() && hasData(diffData.apexclasses)" ng-click="forceMergeAll()">
+                                            <span class="glyphicon glyphicon-arrow-left"></span>
+                                            Merge All
+                                        </button>
+                                        <button class="btn btn-default btn-sm center-block" ng-show="!mergeAll() && hasData(diffData.apexclasses)" ng-click="forceMergeSelected()">
+                                            <span class="glyphicon glyphicon-arrow-left"></span>
+                                            Merge Selected
+                                        </button>
+                                        <span ng-show="!hasData(diffData.apexclasses)" style="padding-top: 40px; display: block;">No differences</span>
+                                    </div>
+                                    <div ng-repeat="apexClass in diffData.apexclasses">
+                                        <label class="checkbox-inline pull-right">
+                                            <input type="checkbox" ng-init="apexClass.selectedForMerge=true" ng-model="apexClass.selectedForMerge">{{getActionLabel(apexClass)}}
+                                        </label>
+                                        <div ng-bind-html="apexClass.diff"></div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
