@@ -23,6 +23,7 @@ require([
       $scope.leftOrgData = {};
       $scope.rightOrgData = {};
       $scope.diffData = {};
+      $scope.pos = {isSelectAll: false};
 
       $scope.mergeAll = function() {
         var all = true;
@@ -43,6 +44,11 @@ require([
         }
       };
 
+      $scope.updateSelection = function() {
+        angular.forEach($scope.diffData.apexclasses, function(value) {
+          value.selectedForMerge = $scope.pos.isSelectAll;
+        });
+      };
 
       $scope.$watchCollection(function() {
         return [$scope.leftOrgData, $scope.rightOrgData];

@@ -152,6 +152,9 @@
                                             <span class="glyphicon glyphicon-arrow-left"></span>
                                             Merge Selected
                                         </button>
+                                        <label class="checkbox-inline pull-right" style="position: absolute; top: 10px; right: 10px;">
+                                            <input type="checkbox" ng-show="hasData(diffData.apexclasses)" ng-model="pos.isSelectAll" ng-change="updateSelection()">{{pos.isSelectAll ? "Unselect All" : "Select All"}}
+                                        </label>
                                         <span ng-show="!hasData(diffData.apexclasses)" style="padding-top: 40px; display: block;">No differences</span>
                                     </div>
                                     <div ng-repeat="apexClass in diffData.apexclasses">
