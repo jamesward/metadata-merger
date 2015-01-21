@@ -186,7 +186,10 @@ require([
       };
 
       $scope.forceMergeAll = function() {
+        $scope.forceMergeSelected();
+      };
 
+      $scope.forceMergeSelected = function() {
         var apexClasses = {
           creates: {},
           updates: {},
@@ -194,14 +197,16 @@ require([
         };
 
         angular.forEach($scope.diffData.apexclasses, function(apexClass) {
-          if (apexClass.create) {
-            apexClasses.creates[apexClass.right.Name] = apexClass.right.Body;
-          }
-          else if (apexClass.update) {
-            apexClasses.updates[apexClass.left.Id] = apexClass.right.Body;
-          }
-          else if (apexClass.delete) {
-            apexClasses.deletes.push(apexClass.left.Id);
+          if (apexClass.selectedForMerge) {
+            if (apexClass.create) {
+              apexClasses.creates[apexClass.right.Name] = apexClass.right.Body;
+            }
+            else if (apexClass.update) {
+              apexClasses.updates[apexClass.left.Id] = apexClass.right.Body;
+            }
+            else if (apexClass.delete) {
+              apexClasses.deletes.push(apexClass.left.Id);
+            }
           }
         });
 
@@ -219,10 +224,6 @@ require([
             console.log(error);
             // todo
           });
-      };
-
-      $scope.forceMergeSelected = function() {
-
       };
 
       $scope.fetchOrgs();
