@@ -1,0 +1,29 @@
+{
+  "name": "Salesforce Metadata Merger",
+  "description": "A tool to diff and merge Salesforce metadata across orgs",
+  "repository": "https://github.com/jamesward/metadata-merger",
+  "website": "http://www.jamesward.com/",
+  "keywords": ["salesforce"],
+  "success_url": "/",
+  "env": {
+    "APPLICATION_SECRET": {
+      "description": "A secret key for crypto and signed cookies.",
+      "generator": "secret"
+    },
+    "ASSETS_URL": {
+      "description": "The WebJar CDN URL",
+      "value": "//cdn.jsdelivr.net"
+    },
+    "FORCE_CONSUMER_KEY": {
+      "description": "The Salesforce OAuth Consumer Key",
+      "required": true
+    },
+    "FORCE_CONSUMER_SECRET": {
+      "description": "The Salesforce OAuth Consumer Secret",
+      "required": true
+    }
+  },
+  "addons": [
+    "heroku-postgresql"
+  ]
+}
