@@ -1,1 +1,1 @@
-web: target/universal/stage/bin/metadata-merger -Ddb.default.migration.auto=true
+web: target/universal/stage/bin/metadata-merger -Ddb.default.migration.auto=true -Dhttp.port=${PORT}
