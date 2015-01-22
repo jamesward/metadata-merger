@@ -1,4 +1,3 @@
-@(loginUrl: String)
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -20,7 +19,8 @@
             </div>
         </div>
         <div class="container">
-            <a href="@loginUrl" class="btn btn-default">Login via Salesforce</a>
+            <a href="@routes.Application.oauthLoginProd()" class="btn btn-default">Login via Salesforce - Normal Instance</a>
+            <a href="@routes.Application.oauthLoginSandbox()" class="btn btn-default">Login via Salesforce - Sandbox Instance</a>
         </div>
     </body>
 </html>

@@ -12,7 +12,7 @@ import utils.AuthInfo
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-case class Org(id: Long, sfId: String, name: String, ownerName: String, edition: String, accessToken: String, refreshToken: String, instanceUrl: String, ownerId: String) {
+case class Org(id: Long, sfId: String, name: String, ownerName: String, edition: String, accessToken: String, refreshToken: String, env: String, instanceUrl: String, ownerId: String) {
 
   private val o = Org.column
 
@@ -36,7 +36,7 @@ object Org extends SQLSyntaxSupport[Org] {
     (JsPath \ "login_url").write[String]
   )(org => (org.id, org.name, org.ownerName, org.edition, org.instanceUrl + "/secur/frontdoor.jsp?sid=" + org.accessToken))
 
-  override val columnNames = Seq("id", "sf_id", "name", "owner_name", "edition", "access_token", "refresh_token", "instance_url", "owner_id")
+  override val columnNames = Seq("id", "sf_id", "name", "owner_name", "edition", "access_token", "refresh_token", "env", "instance_url", "owner_id")
 
   lazy val o = Org.syntax
 
@@ -51,6 +51,7 @@ object Org extends SQLSyntaxSupport[Org] {
       rs.string(o.edition),
       Crypto.decryptAES(rs.string(o.accessToken)),
       Crypto.decryptAES(rs.string(o.refreshToken)),
+      rs.string(o.env),
       rs.string(o.instanceUrl),
       rs.string(o.ownerId)
     )
@@ -74,7 +75,7 @@ object Org extends SQLSyntaxSupport[Org] {
     ).map(Org.db(o)).list()
   }
 
-  def create(sfId: String, name: String, ownerName: String, edition: String, accessToken: String, refreshToken: String, instanceUrl: String, ownerId: String)(implicit session: AsyncDBSession = AsyncDB.sharedSession): Future[Long] = {
+  def create(sfId: String, name: String, ownerName: String, edition: String, accessToken: String, refreshToken: String, env: String, instanceUrl: String, ownerId: String)(implicit session: AsyncDBSession = AsyncDB.sharedSession): Future[Long] = {
     withSQL(
       insert.into(Org).namedValues(
         column.sfId -> sfId,
@@ -83,6 +84,7 @@ object Org extends SQLSyntaxSupport[Org] {
         column.edition -> edition,
         column.accessToken -> Crypto.encryptAES(accessToken),
         column.refreshToken -> Crypto.encryptAES(refreshToken),
+        column.env -> env,
         column.instanceUrl -> instanceUrl,
         column.ownerId -> ownerId
       ).returningId

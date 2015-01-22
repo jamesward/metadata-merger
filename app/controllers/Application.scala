@@ -46,7 +46,7 @@ object Application extends Controller {
     f(org).recoverWith {
       case e: UnauthorizedError =>
         // fetch a new access token using the refresh token
-        forceUtil.refreshToken(org.refreshToken).flatMap { accessToken =>
+        forceUtil.refreshToken(org).flatMap { accessToken =>
           // update the org with the new access token
           org.updateAccessToken(accessToken).flatMap { updatedOrg =>
             // try the call again
@@ -58,13 +58,11 @@ object Application extends Controller {
 
   def app = OwnerAction { implicit request =>
     val encOwnerId = Crypto.encryptAES(request.ownerId)
-    val addOrgUrl = forceUtil.prodLoginUrl + s"&prompt=login&state=$encOwnerId"
-    Ok(views.html.app(addOrgUrl, encOwnerId))
+    Ok(views.html.app(encOwnerId))
   }
 
-  def login = Action { implicit request =>
-    val loginUrl = forceUtil.prodLoginUrl
-    Ok(views.html.login(loginUrl))
+  def login = Action {
+    Ok(views.html.login())
   }
 
   def orgs = OwnerAction.async { request =>
@@ -119,8 +117,28 @@ object Application extends Controller {
 
   }
 
+  def oauthLoginProd() = Action { implicit request =>
+    Redirect(forceUtil.loginUrl(forceUtil.ENV_PROD)).flashing(forceUtil.SALESFORCE_ENV -> forceUtil.ENV_PROD)
+  }
+
+  def oauthLoginSandbox() = Action { implicit request =>
+    Redirect(forceUtil.loginUrl(forceUtil.ENV_SANDBOX)).flashing(forceUtil.SALESFORCE_ENV -> forceUtil.ENV_SANDBOX)
+  }
+
+  def oauthAddProdOrg(encOwnerId: String) = Action { implicit request =>
+    val addOrgUrl = forceUtil.loginUrl(forceUtil.ENV_PROD) + s"&prompt=login&state=$encOwnerId"
+    Redirect(addOrgUrl).flashing(forceUtil.SALESFORCE_ENV -> forceUtil.ENV_PROD)
+  }
+
+  def oauthAddSandboxOrg(encOwnerId: String) = Action { implicit request =>
+    val addOrgUrl = forceUtil.loginUrl(forceUtil.ENV_SANDBOX) + s"&prompt=login&state=$encOwnerId"
+    Redirect(addOrgUrl).flashing(forceUtil.SALESFORCE_ENV -> forceUtil.ENV_SANDBOX)
+  }
+
   // the ownerId is encrypted so that it can't be overwritten
   def oauthCallback(code: String, maybeEncOwnerId: Option[String]) = Action.async { implicit request =>
+
+    val env = request.flash.get(forceUtil.SALESFORCE_ENV).getOrElse(forceUtil.ENV_PROD)
 
     def createOrg(authInfo: AuthInfo, orgId: String, username: String, userId: String, ownerId: String, salesforceUserFuture: Future[SalesforceUser])(implicit session: AsyncDBSession): Future[SalesforceUser] = {
       forceUtil.orgInfo(authInfo, orgId).flatMap { orgInfo =>
@@ -128,8 +146,7 @@ object Application extends Controller {
         val edition = (orgInfo \ "OrganizationType").as[String]
 
         // add the org
-        println(orgId, name, username, edition, authInfo.accessToken, authInfo.refreshToken, authInfo.instanceUrl, ownerId)
-        Org.create(orgId, name, username, edition, authInfo.accessToken, authInfo.refreshToken, authInfo.instanceUrl, ownerId).flatMap { _ =>
+        Org.create(orgId, name, username, edition, authInfo.accessToken, authInfo.refreshToken, env, authInfo.instanceUrl, ownerId).flatMap { _ =>
           // if the SalesforceUser can't be found then create one
           salesforceUserFuture.recoverWith {
             case e: SalesforceUserNotFound =>
@@ -139,7 +156,7 @@ object Application extends Controller {
       }
     }
 
-    val loginFuture = forceUtil.login(code)
+    val loginFuture = forceUtil.login(code, env)
 
     loginFuture.flatMap { authInfo =>
       forceUtil.userInfo(authInfo).flatMap { userInfo =>

@@ -1,4 +1,4 @@
-@(addOrgUrl: String, encOwnerId: String)
+@(encOwnerId: String)
 <!DOCTYPE html>
 <html lang="en" ng-app="myApp">
     <head>
@@ -65,9 +65,13 @@
                             </div>
                         </div>
                         <div class="panel-footer text-center">
-                            <a href="@addOrgUrl" class="btn btn-primary">
+                            <a href="@routes.Application.oauthAddProdOrg(encOwnerId)" class="btn btn-primary">
                                 <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-                                Add Org
+                                Normal
+                            </a>
+                            <a href="@routes.Application.oauthAddSandboxOrg(encOwnerId)" class="btn btn-primary">
+                                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                                Sandbox
                             </a>
                         </div>
                     </div>

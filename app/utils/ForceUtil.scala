@@ -19,8 +19,9 @@ import scala.util.Random
 
 class ForceUtil(implicit app: Application) {
 
+  implicit def toRichFutureWSResponse(f: Future[WSResponse]): RichFutureWSResponse = new RichFutureWSResponse(f)
+
   val API_VERSION = "32.0"
-  val LOGIN_URL = "https://login.salesforce.com/services/oauth2/token"
 
   val defaultTimeout = FiniteDuration(60, TimeUnit.SECONDS)
   val defaultPollInterval = FiniteDuration(1, TimeUnit.SECONDS)
@@ -28,10 +29,23 @@ class ForceUtil(implicit app: Application) {
   val consumerKey = app.configuration.getString("force.oauth.consumer-key").get
   val consumerSecret = app.configuration.getString("force.oauth.consumer-secret").get
 
-  implicit def toRichFutureWSResponse(f: Future[WSResponse]): RichFutureWSResponse = new RichFutureWSResponse(f)
+  val ENV_PROD = "prod"
+  val ENV_SANDBOX = "sandbox"
+  val SALESFORCE_ENV = "salesforce-env"
 
-  def prodLoginUrl(implicit request: RequestHeader) = {
-    app.configuration.getString("force.oauth.prod-login-url").get.format(consumerKey, redirectUri)
+  def loginUrl(env: String)(implicit request: RequestHeader): String = env match {
+    case ENV_PROD => "https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=%s&redirect_uri=%s".format(consumerKey, redirectUri)
+    case ENV_SANDBOX => "https://test.salesforce.com/services/oauth2/authorize?response_type=code&client_id=%s&redirect_uri=%s".format(consumerKey, redirectUri)
+  }
+
+  def tokenUrl(env: String): String = env match {
+    case ENV_PROD => "https://login.salesforce.com/services/oauth2/token"
+    case ENV_SANDBOX => "https://test.salesforce.com/services/oauth2/token"
+  }
+
+  def userinfoUrl(env: String): String = env match {
+    case ENV_PROD => "https://login.salesforce.com/services/oauth2/userinfo"
+    case ENV_SANDBOX => "https://test.salesforce.com/services/oauth2/userinfo"
   }
 
   def redirectUri(implicit request: RequestHeader): String = {
@@ -44,8 +58,8 @@ class ForceUtil(implicit app: Application) {
       withHeaders(HeaderNames.AUTHORIZATION -> s"Bearer ${org.accessToken}")
   }
 
-  def login(code: String)(implicit request: RequestHeader): Future[AuthInfo] = {
-    val wsFuture = WS.url(LOGIN_URL).withQueryString(
+  def login(code: String, env: String)(implicit request: RequestHeader): Future[AuthInfo] = {
+    val wsFuture = WS.url(tokenUrl(env)).withQueryString(
       "grant_type" -> "authorization_code",
       "client_id" -> consumerKey,
       "client_secret" -> consumerSecret,
@@ -69,10 +83,10 @@ class ForceUtil(implicit app: Application) {
     }
   }
 
-  def refreshToken(refreshToken: String): Future[String] = {
-    val wsFuture = WS.url(LOGIN_URL).withQueryString(
+  def refreshToken(org: Org): Future[String] = {
+    val wsFuture = WS.url(tokenUrl(org.env)).withQueryString(
       "grant_type" -> "refresh_token",
-      "refresh_token" -> refreshToken,
+      "refresh_token" -> org.refreshToken,
       "client_id" -> consumerKey,
       "client_secret" -> consumerSecret
     ).post(EmptyContent())
