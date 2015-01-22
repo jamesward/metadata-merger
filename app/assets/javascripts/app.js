@@ -20,8 +20,9 @@ require([
 
       $scope.orgs = [];
       $scope.selectedOrgs = [];
-      $scope.leftOrgData = {};
-      $scope.rightOrgData = {};
+      $scope.viewOrgData = {};
+      $scope.fromOrgData = {};
+      $scope.toOrgData = {};
       $scope.diffData = {};
       $scope.pos = {isSelectAll: false};
 
@@ -51,9 +52,9 @@ require([
       };
 
       $scope.$watchCollection(function() {
-        return [$scope.leftOrgData, $scope.rightOrgData];
+        return [$scope.fromOrgData, $scope.toOrgData];
       }, function() {
-        if (($scope.leftOrgData.apexclasses === undefined) || ($scope.rightOrgData.apexclasses === undefined)) {
+        if (($scope.fromOrgData.apexclasses === undefined) || ($scope.toOrgData.apexclasses === undefined)) {
           return;
         }
 
@@ -61,41 +62,41 @@ require([
 
         function defaultApexClass() {
           return {
-            left: {
+            from: {
               Body: null
             },
-            right: {
+            to: {
               Body: null
             }
           };
         }
 
-        $scope.leftOrgData.apexclasses.forEach(function(item) {
+        $scope.fromOrgData.apexclasses.forEach(function(item) {
           if (apexclasses[item.Name] === undefined) {
             apexclasses[item.Name] = defaultApexClass();
           }
-          apexclasses[item.Name].left = item;
+          apexclasses[item.Name].from = item;
         });
 
-        $scope.rightOrgData.apexclasses.forEach(function(item) {
+        $scope.toOrgData.apexclasses.forEach(function(item) {
           if (apexclasses[item.Name] === undefined) {
             apexclasses[item.Name] = defaultApexClass();
           }
-          apexclasses[item.Name].right = item;
+          apexclasses[item.Name].to = item;
         });
 
         // remove matching classes and set properties that indicate create, update, or delete
         angular.forEach(apexclasses, function(apexClass, apexClassName) {
-          if ((apexClass.left.Body === null) && (apexClass.right.Body !== null)) {
+          if ((apexClass.to.Body === null) && (apexClass.from.Body !== null)) {
             apexClass.create = true;
           }
-          else if ((apexClass.left.Body !== null) && (apexClass.right.Body !== null) && (apexClass.left.Body != apexClass.right.Body)) {
+          else if ((apexClass.to.Body !== null) && (apexClass.from.Body !== null) && (apexClass.to.Body != apexClass.from.Body)) {
             apexClass.update = true;
           }
-          else if ((apexClass.left.Body !== null) && (apexClass.right.Body !== null) && (apexClass.left.Body == apexClass.right.Body)) {
+          else if ((apexClass.to.Body !== null) && (apexClass.from.Body !== null) && (apexClass.to.Body == apexClass.from.Body)) {
             delete apexclasses[apexClassName];
           }
-          else if ((apexClass.left.Body !== null) && (apexClass.right.Body === null)) {
+          else if ((apexClass.to.Body !== null) && (apexClass.from.Body === null)) {
             apexClass.delete = true;
           }
         });
@@ -105,7 +106,7 @@ require([
           if (apexclasses.hasOwnProperty(apexClassKey)) {
             var apexClass = apexclasses[apexClassKey];
 
-            var patchText = diff.createPatch(apexClassKey, apexClass.left.Body, apexClass.right.Body);
+            var patchText = diff.createPatch(apexClassKey, apexClass.to.Body, apexClass.from.Body);
             patchText = "diff --git a/" + apexClassKey + " b/" + apexClassKey + "\n" + patchText;
 
             var diffHtml = Diff2Html.getPrettySideBySideHtmlFromDiff(patchText);
@@ -163,29 +164,31 @@ require([
         }
 
         if ($scope.selectedOrgs.length == 1) {
-          $scope.leftOrgData = org;
-          $scope.rightOrgData = {};
+          $scope.viewOrgData = org;
+          $scope.fromOrgData = org;
+          $scope.toOrgData = {};
           $scope.diffData = {};
           $scope.fetchOrgData($scope.selectedOrgs[0], function(data) {
-            $scope.leftOrgData = data;
+            $scope.viewOrgData = data;
+            $scope.fromOrgData = data;
           });
         }
         else if ($scope.selectedOrgs.length == 2) {
-          $scope.rightOrgData = org;
+          $scope.toOrgData = org;
           $scope.fetchOrgData($scope.selectedOrgs[1], function(data) {
-            $scope.rightOrgData = data;
+            $scope.toOrgData = data;
           });
         }
       };
 
       $scope.flipSelected = function() {
-        var left = $scope.selectedOrgs[0];
+        var from = $scope.selectedOrgs[0];
         $scope.selectedOrgs[0] = $scope.selectedOrgs[1];
-        $scope.selectedOrgs[1] = left;
+        $scope.selectedOrgs[1] = from;
 
-        var leftData = $scope.leftOrgData;
-        $scope.leftOrgData = $scope.rightOrgData;
-        $scope.rightOrgData = leftData;
+        var fromData = $scope.fromOrgData;
+        $scope.fromOrgData = $scope.toOrgData;
+        $scope.toOrgData = fromData;
       };
 
       $scope.getActionLabel = function(apexClass) {
@@ -214,25 +217,25 @@ require([
         angular.forEach($scope.diffData.apexclasses, function(apexClass) {
           if (apexClass.selectedForMerge) {
             if (apexClass.create) {
-              apexClasses.creates[apexClass.right.Name] = apexClass.right.Body;
+              apexClasses.creates[apexClass.from.Name] = apexClass.from.Body;
             }
             else if (apexClass.update) {
-              apexClasses.updates[apexClass.left.Id] = apexClass.right.Body;
+              apexClasses.updates[apexClass.to.Id] = apexClass.from.Body;
             }
             else if (apexClass.delete) {
-              apexClasses.deletes.push(apexClass.left.Id);
+              apexClasses.deletes.push(apexClass.to.Id);
             }
           }
         });
 
-        var url = "/orgs/" + $scope.leftOrgData.id + "/metadata";
+        var url = "/orgs/" + $scope.toOrgData.id + "/metadata";
 
         $http
           .post(url, { apexClasses: apexClasses })
           .success(function(data, status, headers, config) {
             $scope.diffData = {};
-            $scope.fetchOrgData($scope.selectedOrgs[0], function(data) {
-              $scope.leftOrgData = data;
+            $scope.fetchOrgData($scope.selectedOrgs[1], function(data) {
+              $scope.toOrgData = data;
             });
           })
           .error(function(error) {

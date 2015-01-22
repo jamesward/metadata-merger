@@ -79,18 +79,19 @@
                 <div class="col-md-9">
                     <div class="panel panel-default" ng-if="selectedOrgs.length == 0">
                         <div class="panel-body">
-                            Select two orgs to diff, merge, and send pull requests
+                            <p>Select one org to view metadata.</p>
+                            <p>Select two orgs to diff &amp; merge metadata.</p>
                         </div>
                     </div>
                     <div class="panel panel-default" ng-if="selectedOrgs.length == 1">
                         <div class="panel-heading">
-                            {{leftOrgData.name}} {{leftOrgData.owner_name}}
+                            {{viewOrgData.name}} {{viewOrgData.owner_name}}
                             <div style="position: absolute; top: 5px; right: 20px;">
-                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{leftOrgData.login_url + '&retURL=/setup/forcecomHomepage.apexp'}}">
+                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{viewOrgData.login_url + '&retURL=/setup/forcecomHomepage.apexp'}}">
                                     <span class="glyphicon glyphicon-cog"></span>
                                     Setup
                                 </a>
-                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{leftOrgData.login_url + '&retURL=/_ui/common/apex/debug/ApexCSIPage'}}">
+                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{viewOrgData.login_url + '&retURL=/_ui/common/apex/debug/ApexCSIPage'}}">
                                     <span class="glyphicon glyphicon-wrench"></span>
                                     Dev Console
                                 </a>
@@ -113,7 +114,7 @@
 
                                 </div>
                                 <ul class="list-group">
-                                    <li class="list-group-item" ng-repeat="apexclass in leftOrgData.apexclasses">
+                                    <li class="list-group-item" ng-repeat="apexclass in viewOrgData.apexclasses">
                                         <h5>{{apexclass.Name}}</h5>
                                         <div hljs source="apexclass.Body"></div>
                                     </li>
@@ -126,7 +127,7 @@
                             <div class="col-md-5 no-side-padding">
                                 <div class="panel panel-default">
                                     <div class="panel-heading text-center">
-                                        Merge To: {{leftOrgData.name}} {{leftOrgData.owner_name}}
+                                        Merge From: {{fromOrgData.name}} {{fromOrgData.owner_name}}
                                     </div>
                                 </div>
                             </div>
@@ -138,7 +139,7 @@
                             <div class="col-md-5 no-side-padding">
                                 <div class="panel panel-default">
                                     <div class="panel-heading text-center">
-                                        Merge From: {{rightOrgData.name}} {{rightOrgData.owner_name}}
+                                        Merge To: {{toOrgData.name}} {{toOrgData.owner_name}}
                                     </div>
                                 </div>
                             </div>
@@ -149,12 +150,14 @@
                                     <div style="padding-bottom: 10px">
                                         <h4 style="position: absolute">Apex Classes</h4>
                                         <button class="btn btn-default btn-sm center-block" ng-show="mergeAll() && hasData(diffData.apexclasses)" ng-click="forceMergeAll()">
-                                            <span class="glyphicon glyphicon-arrow-left"></span>
+                                            <span class="glyphicon glyphicon-arrow-right"></span>
                                             Merge All
+                                            <span class="glyphicon glyphicon-arrow-right"></span>
                                         </button>
                                         <button class="btn btn-default btn-sm center-block" ng-show="!mergeAll() && hasData(diffData.apexclasses)" ng-click="forceMergeSelected()">
-                                            <span class="glyphicon glyphicon-arrow-left"></span>
+                                            <span class="glyphicon glyphicon-arrow-right"></span>
                                             Merge Selected
+                                            <span class="glyphicon glyphicon-arrow-right"></span>
                                         </button>
                                         <label class="checkbox-inline pull-right" style="position: absolute; top: 10px; right: 10px;">
                                             <input type="checkbox" ng-show="hasData(diffData.apexclasses)" ng-model="pos.isSelectAll" ng-change="updateSelection()">{{pos.isSelectAll ? "Unselect All" : "Select All"}}
