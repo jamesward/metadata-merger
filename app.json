@@ -7,12 +7,8 @@
   "success_url": "/",
   "env": {
     "APPLICATION_SECRET": {
-      "description": "A secret key for crypto and signed cookies",
+      "description": "A secret key for crypto and signed cookies.",
       "generator": "secret"
-    },
-    "JAVA_OPTS": {
-      "description": "The default Java options",
-      "value": "-Xss512k -XX:+UseCompressedOops -Ddb.default.migration.auto=true"
     },
     "ASSETS_URL": {
       "description": "The WebJar CDN URL",
