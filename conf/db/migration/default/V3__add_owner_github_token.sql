@@ -1,0 +1,1 @@
+ALTER TABLE owner ADD COLUMN github_access_token VARCHAR(255);

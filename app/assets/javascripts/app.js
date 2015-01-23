@@ -4,7 +4,7 @@ require([
   "angular",
   "diff2html",
   "diff",
-  "jquery",
+  "bootstrap",
   "angular-highlightjs-min",
   "highlightjs-lang-java-min",
   "css!bootstrap-css",
@@ -25,6 +25,9 @@ require([
       $scope.toOrgData = {};
       $scope.diffData = {};
       $scope.pos = {isSelectAll: false};
+      $scope.isGithubReady = false;
+      $scope.githubRepos = [];
+
 
       $scope.mergeAll = function() {
         var all = true;
@@ -120,7 +123,7 @@ require([
         $scope.diffData.apexclasses = apexclasses;
       });
 
-      $scope.fetchOrgs = function() {
+      function fetchOrgs() {
         $http
           .get("/orgs")
           .success(function(data, status, headers, config) {
@@ -130,7 +133,7 @@ require([
             console.log(error);
             // todo
           });
-      };
+      }
 
       $scope.fetchOrgData = function(id, callback) {
         $http
@@ -244,7 +247,41 @@ require([
           });
       };
 
-      $scope.fetchOrgs();
+      $scope.syncToGitHub = function() {
+
+      };
+
+      function getGitHubReadyStatus() {
+        $http
+          .get("/github/status")
+          .success(function(data) {
+            $scope.isGithubReady = data.isReady;
+            if ($scope.isGithubReady) {
+              fetchGitHubRepos();
+            }
+          })
+          .error(function(error) {
+            console.log(error);
+            // todo
+          });
+      }
+
+      function fetchGitHubRepos() {
+        $http
+          .get("/github/repos")
+          .success(function(data) {
+            $scope.githubRepos = data;
+          })
+          .error(function(error) {
+            console.log(error);
+            // todo
+          });
+      }
+
+
+      // init
+      fetchOrgs();
+      getGitHubReadyStatus();
 
     });
 

@@ -12,6 +12,8 @@ GET         /orgs                        controllers.Application.orgs
 GET         /orgs/:orgId/metadata        controllers.Application.metadata(orgId: Long)
 POST        /orgs/:orgId/metadata        controllers.Application.metadataUpdate(orgId: Long)
 
+GET         /github/status               controllers.Application.githubStatus
+GET         /github/repos                controllers.Application.githubRepos
 
 # OAuth
 GET         /_login_prod                 controllers.Application.oauthLoginProd()
@@ -19,6 +21,7 @@ GET         /_login_sandbox              controllers.Application.oauthLoginSandb
 GET         /_add_prod_org               controllers.Application.oauthAddProdOrg(encOwnerId: String)
 GET         /_add_sandbox_org            controllers.Application.oauthAddSandboxOrg(encOwnerId: String)
 GET         /_oauth_callback             controllers.Application.oauthCallback(code: String, state: Option[String])
+GET         /_github_oauth_callback      controllers.Application.githubOauthCallback(code: String, state: String)
 
 
 # Map static resources from the /public folder to the /assets URL path

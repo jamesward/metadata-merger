@@ -12,3 +12,9 @@ body {
     padding-top: 10px;
     padding-right: 10px;
 }
+
+.scrollable-menu {
+    height: auto;
+    max-height: 600px;
+    overflow-x: hidden;
+}

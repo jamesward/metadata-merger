@@ -4,12 +4,12 @@ import models._
 import play.api.Play
 import play.api.data.validation.ValidationError
 import play.api.libs.Crypto
-import play.api.libs.json.{JsValue, Json, JsObject, JsPath}
+import play.api.libs.json._
 import play.api.mvc.Results.EmptyContent
 
 import play.api.mvc._
 import scalikejdbc.async.{AsyncDBSession, AsyncDB}
-import utils.{AuthInfo, UnauthorizedError, ForceUtil}
+import utils.{GithubUtil, AuthInfo, UnauthorizedError, ForceUtil}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -18,8 +18,10 @@ import scala.concurrent.Future
 object Application extends Controller {
 
   lazy val forceUtil = ForceUtil(Play.current)
+  lazy val githubUtil = GithubUtil(Play.current)
 
   val X_ENCRYPTED_OWNER_ID = "X-ENCRYPTED-OWNER-ID"
+  val X_GITHUB_ACCESS_TOKEN = "X-GITHUB-ACCESS-TOKEN"
 
   private def errorsToJson(errors: Seq[(JsPath, Seq[ValidationError])]): JsObject = {
     Json.obj("errors" -> errors.toString())
@@ -58,7 +60,8 @@ object Application extends Controller {
 
   def app = OwnerAction { implicit request =>
     val encOwnerId = Crypto.encryptAES(request.ownerId)
-    Ok(views.html.app(encOwnerId))
+    val githubAuthUrl = githubUtil.authUrl(encOwnerId)
+    Ok(views.html.app(encOwnerId, githubAuthUrl))
   }
 
   def login = Action {
@@ -195,6 +198,35 @@ object Application extends Controller {
       Redirect(routes.Application.app()).flashing(X_ENCRYPTED_OWNER_ID -> encOwnerId)
     } recover { case e: Error =>
       Redirect(routes.Application.login())
+    }
+  }
+
+  def githubStatus = OwnerAction.async { request =>
+    Owner.find(request.ownerId).map { owner =>
+      Ok(Json.obj("isReady" -> owner.githubAccessToken.isDefined))
+    }
+  }
+
+  def githubRepos = OwnerAction.async { request =>
+    Owner.find(request.ownerId).flatMap { owner =>
+      owner.githubAccessToken.fold(Future.successful(Unauthorized("No GitHub access token found"))) { accessToken =>
+        githubUtil.repos(accessToken).map { repos =>
+          import play.api.libs.json._
+          val justFullName = (__ \ 'full_name).json.pickBranch
+          Ok(JsArray(repos.value.map(_.transform(justFullName).get)))
+        }
+      }
+    }
+  }
+
+  def githubOauthCallback(code: String, encOwnerId: String) = Action.async { implicit request =>
+    val ownerId = Crypto.decryptAES(encOwnerId)
+    githubUtil.accessToken(code).flatMap { accessToken =>
+      Owner.find(ownerId).flatMap { owner =>
+        owner.updateGithubAccessToken(accessToken).map { _ =>
+          Redirect(routes.Application.app()).flashing(X_ENCRYPTED_OWNER_ID -> encOwnerId)
+        }
+      }
     }
   }
 
