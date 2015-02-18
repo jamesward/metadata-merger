@@ -4,12 +4,13 @@ import java.net.URL
 import java.util.concurrent.TimeUnit
 
 import models.Org
+import org.apache.commons.codec.binary.Base64
 import play.api.Application
 import play.api.http.{MimeTypes, HeaderNames, Status}
 import play.api.libs.concurrent.Akka
-import play.api.libs.json.{JsArray, JsValue, Json}
+import play.api.libs.json.{JsObject, JsArray, JsValue, Json}
 import play.api.libs.ws.{WS, WSRequestHolder, WSResponse}
-import play.api.mvc.RequestHeader
+import play.api.mvc.{Result, RequestHeader}
 import play.api.mvc.Results.EmptyContent
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -49,7 +50,6 @@ class GithubUtil(implicit app: Application) {
     ).withHeaders(HeaderNames.ACCEPT -> MimeTypes.JSON).post(EmptyContent())
 
     wsFuture.flatMap { response =>
-      println(response.body)
       (response.json \ "access_token").asOpt[String].fold {
         Future.failed[String](UnauthorizedError(response.body))
       } {
@@ -106,6 +106,130 @@ class GithubUtil(implicit app: Application) {
       val userReposFuture = allRepos("user/repos", accessToken)
       Future.fold(orgReposFutures :+ userReposFuture)(JsArray()) { case (allRepos, orgRepos) =>
         allRepos ++ orgRepos.as[JsArray]
+      }
+    }
+  }
+
+  def apexClasses(fullName: String, accessToken: String): Future[JsArray] = {
+    ws(s"repos/$fullName/contents/classes", accessToken).get().flatMap { classesResponse =>
+      classesResponse.status match {
+        case Status.NOT_FOUND =>
+          Future.successful(Json.arr())
+        case Status.OK =>
+
+          val classDetailFutures = classesResponse.json.as[Seq[JsObject]].map { json =>
+            val path = (json \ "path").as[String]
+            contents(fullName, path, accessToken)
+          }
+
+          Future.fold(classDetailFutures)(Json.arr()) { case (jsonArray, classDetails) =>
+            val path = (classDetails \ "path").as[String]
+            val name = (classDetails \ "name").as[String].stripSuffix(".cls")
+            val base64Contents = (classDetails \ "content").as[String]
+
+            jsonArray :+ Json.obj(
+              "Id" -> name,
+              "Name" -> name,
+              "Body" -> new String(Base64.decodeBase64(base64Contents))
+            )
+          }
+        case _ =>
+          Future.failed(RequestError(classesResponse.body))
+      }
+    }
+  }
+
+  def apexClass(fullName: String, name: String, accessToken: String): Future[JsValue] = {
+    ws(s"repos/$fullName/contents/${apexClassPath(name)}", accessToken).get().flatMap { response =>
+      response.status match {
+        case Status.OK =>
+          Future.successful(response.json)
+        case _ =>
+          Future.failed(RequestError(response.body))
+      }
+    }
+  }
+
+  def contents(fullName: String, path: String, accessToken: String): Future[JsValue] = {
+    ws(s"repos/$fullName/contents/$path", accessToken).get().flatMap { response =>
+      response.status match {
+        case Status.OK =>
+          Future.successful(response.json)
+        case _ =>
+          Future.failed(RequestError(response.body))
+      }
+    }
+  }
+
+  private def apexClassPath(name: String): String = s"classes/$name.cls"
+
+  def createApexClass(fullName: String, name: String, body: String, accessToken: String): Future[JsValue] = {
+    val json = Json.obj(
+      "path" -> apexClassPath(name),
+      "message" -> s"Created Apex Class: $name",
+      "content" -> Base64.encodeBase64String(body.getBytes)
+    )
+    ws(s"repos/$fullName/contents/${apexClassPath(name)}", accessToken).put(json).flatMap { response =>
+      response.status match {
+        case Status.CREATED =>
+          Future.successful(response.json)
+        case _ =>
+          Future.failed(RequestError(response.body))
+      }
+    }
+  }
+
+  def updateApexClasses(fullName: String, classes: Map[String, String], accessToken: String): Future[Iterable[JsValue]] = {
+    println(classes)
+    Future.sequence {
+      classes.map { case(name, body) =>
+        updateApexClass(fullName, name, body, accessToken)
+      }
+    }
+  }
+
+  def updateApexClass(fullName: String, name: String, body: String, accessToken: String): Future[JsValue] = {
+    println(fullName, name, body)
+    apexClass(fullName, name, accessToken).flatMap { apexClassJson =>
+      val sha = (apexClassJson \ "sha").as[String]
+
+      println(apexClassJson)
+
+      val json = Json.obj(
+        "path" -> apexClassPath(name),
+        "message" -> s"Updated Apex Class: $name",
+        "content" -> Base64.encodeBase64String(body.getBytes),
+        "sha" -> sha
+      )
+
+      ws(s"repos/$fullName/contents/${apexClassPath(name)}", accessToken).put(json).flatMap { response =>
+        response.status match {
+          case Status.OK =>
+            Future.successful(response.json)
+          case _ =>
+            Future.failed(RequestError(response.body))
+        }
+      }
+    }
+  }
+
+  def deleteApexClass(fullName: String, name: String, accessToken: String): Future[JsValue] = {
+    apexClass(fullName, name, accessToken).flatMap { apexClassJson =>
+      val sha = (apexClassJson \ "sha").as[String]
+
+      val json = Json.obj(
+        "path" -> apexClassPath(name),
+        "message" -> s"Deleted Apex Class: $name",
+        "sha" -> sha
+      )
+
+      ws(s"repos/$fullName/contents/${apexClassPath(name)}", accessToken).withBody(json).delete().flatMap { response =>
+        response.status match {
+          case Status.OK =>
+            Future.successful(response.json)
+          case _ =>
+            Future.failed(RequestError(response.body))
+        }
       }
     }
   }

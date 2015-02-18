@@ -38,7 +38,7 @@
         </script>
         <script data-main="@routes.Assets.versioned("javascripts/app.js")" src="@StaticWebJarAssets.url(WebJarAssets.locate("require.min.js"))"></script>
     </head>
-    <body class="ng-cloak" ng-controller="OrgController">
+    <body class="ng-cloak" ng-controller="RemoteController">
         <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
             <div class="container">
                 <div class="navbar-header">
@@ -46,6 +46,28 @@
                 </div>
                 <div class="navbar-right">
                     <a href="@githubOauthUrl" class="btn btn-default navbar-btn" ng-hide="isGithubReady">Connect to GitHub</a>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-default navbar-btn dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+                            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                            Salesforce
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu" role="menu">
+                            <li><a href="@routes.Application.oauthAddProdOrg(encOwnerId)">Production / Developer Org</a></li>
+                            <li><a href="@routes.Application.oauthAddSandboxOrg(encOwnerId)">Sandbox Org</a></li>
+                            <li><a href="#" class="disabled">Custom Domain</a></li>
+                        </ul>
+                    </div>
+                    <div class="btn-group" ng-show="isGithubReady">
+                        <button type="button" class="btn btn-default navbar-btn dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+                            <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                            GitHub
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu scrollable-menu" role="menu">
+                            <li ng-repeat="repo in githubRepos"><a href="" ng-click="addRepo(repo)">{{repo.full_name}}</a></li>
+                        </ul>
+                    </div>
                     <a href="@routes.Application.login()" class="btn btn-default navbar-btn">Logout</a>
                 </div>
             </div>
@@ -56,56 +78,40 @@
                 <div class="col-md-3">
                     <div class="panel panel-default">
                         <div class="panel-heading">
-                            <h3 class="panel-title">Your Orgs</h3>
+                            <h3 class="panel-title">Your Orgs &amp; Repos</h3>
                         </div>
-                        <div class="panel-body">
-                            <div class="list-group">
-                                <a href="" class="list-group-item" ng-repeat="org in orgs" ng-click="selectOrg(org)" ng-class="{active: selectedOrgs.indexOf(org.id) >= 0}">
-                                    <h4 class="list-group-item-heading">{{org.name}}</h4>
-                                    <p class="list-group-item-text">{{org.owner_name}}</p>
-                                    <p class="list-group-item-text">{{org.edition}}</p>
-                                </a>
-                            </div>
-                        </div>
-                        <div class="panel-footer text-center">
-                            <a href="@routes.Application.oauthAddProdOrg(encOwnerId)" class="btn btn-primary">
-                                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-                                Normal
-                            </a>
-                            <a href="@routes.Application.oauthAddSandboxOrg(encOwnerId)" class="btn btn-primary">
-                                <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-                                Sandbox
+                        <div class="list-group">
+                            <a href="" class="list-group-item" ng-repeat="remote in remotes" ng-click="selectRemote(remote)" ng-class="{active: selectedRemotes.indexOf(remote) >= 0}">
+                                <h4 class="list-group-item-heading">{{remote.name}}</h4>
+                                <p class="list-group-item-text">{{remote.owner_name}}{{remote.full_name}}</p>
+                                <p class="list-group-item-text">{{remote.edition}}{{remote.description}}</p>
                             </a>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-9">
-                    <div class="panel panel-default" ng-if="selectedOrgs.length == 0">
+                    <div class="panel panel-default" ng-if="selectedRemotes.length == 0">
                         <div class="panel-body">
-                            <p>Select one org to view metadata.</p>
-                            <p>Select two orgs to diff &amp; merge metadata.</p>
+                            <p>Select one org / repo to view metadata.</p>
+                            <p>Select two orgs / repos to diff &amp; merge metadata.</p>
                         </div>
                     </div>
-                    <div class="panel panel-default" ng-if="selectedOrgs.length == 1">
+                    <div class="panel panel-default" ng-if="selectedRemotes.length == 1">
                         <div class="panel-heading">
-                            {{viewOrgData.name}} {{viewOrgData.owner_name}}
+                            {{viewRemoteData.name}} {{viewRemoteData.owner_name}}{{viewRemoteData.full_name}}
                             <div style="position: absolute; top: 5px; right: 20px;">
-                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{viewOrgData.login_url + '&retURL=/setup/forcecomHomepage.apexp'}}">
+                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{viewRemoteData.login_url + '&retURL=/setup/forcecomHomepage.apexp'}}" ng-show="viewRemoteData.org">
                                     <span class="glyphicon glyphicon-cog"></span>
                                     Setup
                                 </a>
-                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{viewOrgData.login_url + '&retURL=/_ui/common/apex/debug/ApexCSIPage'}}">
+                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{viewRemoteData.login_url + '&retURL=/_ui/common/apex/debug/ApexCSIPage'}}"  ng-show="viewRemoteData.org">
                                     <span class="glyphicon glyphicon-wrench"></span>
                                     Dev Console
                                 </a>
-                                <div class="btn-group btn-group-sm" ng-class="{disabled: !isGithubReady}">
-                                    <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
-                                        Sync to GitHub <span class="caret"></span>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-right scrollable-menu" role="menu">
-                                        <li ng-repeat="repo in githubRepos"><a href="#">{{repo.full_name}}</a></li>
-                                    </ul>
-                                </div>
+                                <a class="btn btn-default btn-sm" target="_blank" ng-href="{{viewRemoteData.html_url}}"  ng-show="viewRemoteData.repo">
+                                    <span class="glyphicon glyphicon-globe"></span>
+                                    GitHub Repo
+                                </a>
                             </div>
                         </div>
                         <ul class="list-group">
@@ -114,7 +120,7 @@
                                     <h4 style="display: inline-block">Apex Classes</h4>
                                 </div>
                                 <ul class="list-group">
-                                    <li class="list-group-item" ng-repeat="apexclass in viewOrgData.apexclasses">
+                                    <li class="list-group-item" ng-repeat="apexclass in viewRemoteData.apexclasses">
                                         <h5>{{apexclass.Name}}</h5>
                                         <div hljs source="apexclass.Body"></div>
                                     </li>
@@ -122,12 +128,12 @@
                             </li>
                         </ul>
                     </div>
-                    <div ng-if="selectedOrgs.length == 2">
+                    <div ng-if="selectedRemotes.length == 2">
                         <div class="row">
                             <div class="col-md-5 no-side-padding">
                                 <div class="panel panel-default">
                                     <div class="panel-heading text-center">
-                                        Merge From: {{fromOrgData.name}} {{fromOrgData.owner_name}}
+                                        Merge From: {{fromRemoteData.name}} {{fromRemoteData.owner_name}}
                                     </div>
                                 </div>
                             </div>
@@ -139,7 +145,7 @@
                             <div class="col-md-5 no-side-padding">
                                 <div class="panel panel-default">
                                     <div class="panel-heading text-center">
-                                        Merge To: {{toOrgData.name}} {{toOrgData.owner_name}}
+                                        Merge To: {{toRemoteData.name}} {{toRemoteData.owner_name}}
                                     </div>
                                 </div>
                             </div>

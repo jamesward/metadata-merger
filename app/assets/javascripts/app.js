@@ -14,15 +14,15 @@ require([
 ], function(angular, Diff2Html, diff) {
 
   angular.module("myApp", ["hljs"])
-    .controller("OrgController", function($scope, $http, $sce) {
+    .controller("RemoteController", function($scope, $http, $sce) {
 
       $http.defaults.headers.common["X-ENCRYPTED-OWNER-ID"] = window.encOwnerId;
 
-      $scope.orgs = [];
-      $scope.selectedOrgs = [];
-      $scope.viewOrgData = {};
-      $scope.fromOrgData = {};
-      $scope.toOrgData = {};
+      $scope.remotes = [];
+      $scope.selectedRemotes = [];
+      $scope.viewRemoteData = {};
+      $scope.fromRemoteData = {};
+      $scope.toRemoteData = {};
       $scope.diffData = {};
       $scope.pos = {isSelectAll: false};
       $scope.isGithubReady = false;
@@ -55,9 +55,9 @@ require([
       };
 
       $scope.$watchCollection(function() {
-        return [$scope.fromOrgData, $scope.toOrgData];
+        return [$scope.fromRemoteData, $scope.toRemoteData];
       }, function() {
-        if (($scope.fromOrgData.apexclasses === undefined) || ($scope.toOrgData.apexclasses === undefined)) {
+        if (($scope.fromRemoteData.apexclasses === undefined) || ($scope.toRemoteData.apexclasses === undefined)) {
           return;
         }
 
@@ -74,14 +74,14 @@ require([
           };
         }
 
-        $scope.fromOrgData.apexclasses.forEach(function(item) {
+        $scope.fromRemoteData.apexclasses.forEach(function(item) {
           if (apexclasses[item.Name] === undefined) {
             apexclasses[item.Name] = defaultApexClass();
           }
           apexclasses[item.Name].from = item;
         });
 
-        $scope.toOrgData.apexclasses.forEach(function(item) {
+        $scope.toRemoteData.apexclasses.forEach(function(item) {
           if (apexclasses[item.Name] === undefined) {
             apexclasses[item.Name] = defaultApexClass();
           }
@@ -127,7 +127,10 @@ require([
         $http
           .get("/orgs")
           .success(function(data, status, headers, config) {
-            $scope.orgs = data;
+            angular.forEach(data, function(org) {
+              org.org = true;
+              $scope.remotes.push(org);
+            });
           })
           .error(function(error) {
             console.log(error);
@@ -135,10 +138,36 @@ require([
           });
       }
 
+      // fetch the user's repos
+      function fetchRepos() {
+        $http
+          .get("/repos")
+          .success(function(data, status, headers, config) {
+            angular.forEach(data, function(repo) {
+              repo.repo = true;
+              $scope.remotes.push(repo);
+            });
+          })
+          .error(function(error) {
+            console.log(error);
+            // todo
+          });
+      }
+
+      function fetchRemoteData(remote, callback) {
+        if (remote.org) {
+          $scope.fetchOrgData(remote.id, callback);
+        }
+        else if (remote.repo) {
+          $scope.fetchRepoData(remote.id, callback);
+        }
+      }
+
       $scope.fetchOrgData = function(id, callback) {
         $http
           .get("/orgs/" + id + "/metadata")
           .success(function(data, status, headers, config) {
+            data.org = true;
             callback(data);
           })
           .error(function(error) {
@@ -147,51 +176,62 @@ require([
           });
       };
 
-      $scope.selectOrg = function(org) {
-        var id = org.id;
+      $scope.fetchRepoData = function(id, callback) {
+        $http
+          .get("/repos/" + id + "/metadata")
+          .success(function(data, status, headers, config) {
+            data.repo = true;
+            callback(data);
+          })
+          .error(function(error) {
+            console.log(error);
+            // todo
+          });
+      };
 
-        var i = $scope.selectedOrgs.indexOf(id);
+      $scope.selectRemote = function(remote) {
+        var i = $scope.selectedRemotes.indexOf(remote);
 
         if (i >= 0) {
           // unselect
-          $scope.selectedOrgs.splice(i, 1);
+          $scope.selectedRemotes.splice(i, 1);
         }
-        else if ($scope.selectedOrgs.length < 2) {
+        else if ($scope.selectedRemotes.length < 2) {
           // add selection
-          $scope.selectedOrgs.push(id);
+          $scope.selectedRemotes.push(remote);
         }
-        else if ($scope.selectedOrgs.length == 2) {
+        else if ($scope.selectedRemotes.length == 2) {
           // replace selection
-          $scope.selectedOrgs.pop();
-          $scope.selectedOrgs.push(id);
+          $scope.selectedRemotes.pop();
+          $scope.selectedRemotes.push(remote);
         }
 
-        if ($scope.selectedOrgs.length == 1) {
-          $scope.viewOrgData = org;
-          $scope.fromOrgData = org;
-          $scope.toOrgData = {};
+        if ($scope.selectedRemotes.length == 1) {
+          $scope.viewRemoteData = remote;
+          $scope.fromRemoteData = remote;
+          $scope.toRemoteData = {};
           $scope.diffData = {};
-          $scope.fetchOrgData($scope.selectedOrgs[0], function(data) {
-            $scope.viewOrgData = data;
-            $scope.fromOrgData = data;
+          fetchRemoteData($scope.selectedRemotes[0], function (data) {
+            $scope.viewRemoteData = data;
+            $scope.fromRemoteData = data;
           });
         }
-        else if ($scope.selectedOrgs.length == 2) {
-          $scope.toOrgData = org;
-          $scope.fetchOrgData($scope.selectedOrgs[1], function(data) {
-            $scope.toOrgData = data;
+        else if ($scope.selectedRemotes.length == 2) {
+          $scope.toRemoteData = remote;
+          fetchRemoteData($scope.selectedRemotes[1], function(data) {
+            $scope.toRemoteData = data;
           });
         }
       };
 
       $scope.flipSelected = function() {
-        var from = $scope.selectedOrgs[0];
-        $scope.selectedOrgs[0] = $scope.selectedOrgs[1];
-        $scope.selectedOrgs[1] = from;
+        var from = $scope.selectedRemotes[0];
+        $scope.selectedRemotes[0] = $scope.selectedRemotes[1];
+        $scope.selectedRemotes[1] = from;
 
-        var fromData = $scope.fromOrgData;
-        $scope.fromOrgData = $scope.toOrgData;
-        $scope.toOrgData = fromData;
+        var fromData = $scope.fromRemoteData;
+        $scope.fromRemoteData = $scope.toRemoteData;
+        $scope.toRemoteData = fromData;
       };
 
       $scope.getActionLabel = function(apexClass) {
@@ -231,14 +271,24 @@ require([
           }
         });
 
-        var url = "/orgs/" + $scope.toOrgData.id + "/metadata";
+
+        var url = "";
+
+        if ($scope.toRemoteData.org) {
+          url = "/orgs/" + $scope.toRemoteData.id + "/metadata";
+        }
+        else if ($scope.toRemoteData.repo) {
+          url = "/repos/" + $scope.toRemoteData.id + "/metadata";
+        }
 
         $http
           .post(url, { apexClasses: apexClasses })
           .success(function(data, status, headers, config) {
             $scope.diffData = {};
-            $scope.fetchOrgData($scope.selectedOrgs[1], function(data) {
-              $scope.toOrgData = data;
+            $scope.fetchRemoteData($scope.selectedRemotes[1], function(data) {
+              data.org = $scope.toRemoteData.org;
+              data.repo = $scope.toRemoteData.repo;
+              $scope.toRemoteData = data;
             });
           })
           .error(function(error) {
@@ -258,6 +308,7 @@ require([
             $scope.isGithubReady = data.isReady;
             if ($scope.isGithubReady) {
               fetchGitHubRepos();
+              fetchRepos();
             }
           })
           .error(function(error) {
@@ -266,6 +317,7 @@ require([
           });
       }
 
+      // fetch all of the available GitHub Repos
       function fetchGitHubRepos() {
         $http
           .get("/github/repos")
@@ -277,6 +329,18 @@ require([
             // todo
           });
       }
+
+      $scope.addRepo = function(repo) {
+        $http
+          .post("/repos", repo)
+          .success(function(data) {
+            fetchRepos();
+          })
+          .error(function(error) {
+            console.log(error);
+            // todo
+          });
+      };
 
 
       // init

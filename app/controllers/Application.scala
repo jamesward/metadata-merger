@@ -86,17 +86,17 @@ object Application extends Controller {
     }
   }
 
+  case class ApexUpdates(creates: Map[String, String], updates: Map[String, String], deletes: Seq[String])
+
+  private def maybeApexUpdates(json: JsValue): Option[ApexUpdates] = for {
+    creates <- (json \ "apexClasses" \ "creates").asOpt[Map[String, String]]
+    updates <- (json \ "apexClasses" \ "updates").asOpt[Map[String, String]]
+    deletes <- (json \ "apexClasses" \ "deletes").asOpt[Seq[String]]
+  } yield ApexUpdates(creates, updates, deletes)
+
   def metadataUpdate(orgId: Long) = OwnerAction.async(parse.json) { request =>
 
-    case class ApexUpdates(creates: Map[String, String], updates: Map[String, String], deletes: Seq[String])
-
-    val maybeApexUpdates = for {
-      creates <- (request.body \ "apexClasses" \ "creates").asOpt[Map[String, String]]
-      updates <- (request.body \ "apexClasses" \ "updates").asOpt[Map[String, String]]
-      deletes <- (request.body \ "apexClasses" \ "deletes").asOpt[Seq[String]]
-    } yield ApexUpdates(creates, updates, deletes)
-
-    maybeApexUpdates.fold(Future.successful(BadRequest(""))) { apexUpdates =>
+    maybeApexUpdates(request.body).fold(Future.successful(BadRequest(""))) { apexUpdates =>
       // todo: refresh handler
 
       val orgFuture = Org.find(orgId, request.ownerId)
@@ -211,8 +211,15 @@ object Application extends Controller {
     Owner.find(request.ownerId).flatMap { owner =>
       owner.githubAccessToken.fold(Future.successful(Unauthorized("No GitHub access token found"))) { accessToken =>
         githubUtil.repos(accessToken).map { repos =>
-          import play.api.libs.json._
-          val justFullName = (__ \ 'full_name).json.pickBranch
+          import play.api.libs.functional.syntax._
+          import play.api.libs.json.Reads._
+          val justFullName = (
+            (__ \ 'id).json.pickBranch ~
+            (__ \ 'name).json.pickBranch ~
+            (__ \ 'full_name).json.pickBranch ~
+            (__ \ 'description).json.pickBranch ~
+            (__ \ 'html_url).json.pickBranch
+          ).reduce
           Ok(JsArray(repos.value.map(_.transform(justFullName).get)))
         }
       }
@@ -225,6 +232,73 @@ object Application extends Controller {
       Owner.find(ownerId).flatMap { owner =>
         owner.updateGithubAccessToken(accessToken).map { _ =>
           Redirect(routes.Application.app()).flashing(X_ENCRYPTED_OWNER_ID -> encOwnerId)
+        }
+      }
+    }
+  }
+
+  def repos = OwnerAction.async { request =>
+    Repo.findAllByOwnerId(request.ownerId).map { repos =>
+      Ok(Json.toJson(repos))
+    }
+  }
+
+  def addRepo() = OwnerAction.async(parse.json) { request =>
+
+    val maybeData = for {
+      id <- (request.body \ "id").asOpt[Long]
+      name <- (request.body \ "name").asOpt[String]
+      fullName <- (request.body \ "full_name").asOpt[String]
+      description <- (request.body \ "description").asOpt[String]
+      htmlUrl <- (request.body \ "html_url").asOpt[String]
+    } yield (id, name, fullName, description, htmlUrl)
+
+    maybeData.fold(Future.successful(BadRequest("Missing required data"))) {
+      case (id, name, fullName, description, htmlUrl) =>
+        Repo.create(id, name, fullName, description, htmlUrl, request.ownerId).map { rowId =>
+          Created(request.body)
+        }
+    }
+  }
+
+  def repoMetadata(repoId: Long) = OwnerAction.async { request =>
+    Owner.find(request.ownerId).flatMap { owner =>
+      Repo.find(repoId, request.ownerId).flatMap { repo =>
+        owner.githubAccessToken.fold(Future.successful(BadRequest("No GitHub Account"))) { githubAccessToken =>
+          githubUtil.apexClasses(repo.fullName, githubAccessToken).map { apexClassesJson =>
+            val repoJson = Json.toJson(repo).as[JsObject]
+            Ok(repoJson + ("apexclasses" -> apexClassesJson))
+          }
+        }
+      }
+    }
+  }
+
+  def repoMetadataUpdate(repoId: Long) = OwnerAction.async(parse.json) { request =>
+    maybeApexUpdates(request.body).fold(Future.successful(BadRequest(""))) { apexUpdates =>
+      // todo: refresh handler
+
+      println(apexUpdates)
+
+      Owner.find(request.ownerId).flatMap { owner =>
+        Repo.find(repoId, request.ownerId).flatMap { repo =>
+          owner.githubAccessToken.fold(Future.successful(BadRequest("No GitHub Account"))) { githubAccessToken =>
+
+            val createsFutures = apexUpdates.creates.map { case (name, body) =>
+              githubUtil.createApexClass(repo.fullName, name, body, githubAccessToken)
+            }
+            val updatesFutures = githubUtil.updateApexClasses(repo.fullName, apexUpdates.updates, githubAccessToken)
+            val deletesFutures = apexUpdates.deletes.map { name =>
+              githubUtil.deleteApexClass(repo.fullName, name, githubAccessToken)
+            }
+
+            Future.sequence(createsFutures ++ Seq(updatesFutures) ++ deletesFutures).map { _ =>
+              Ok(EmptyContent())
+            } recover {
+              case e: Exception =>
+                InternalServerError(e.toString)
+            }
+          }
         }
       }
     }

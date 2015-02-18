@@ -219,13 +219,6 @@ object ForceUtil {
 
 case class AuthInfo(idUrl: String, accessToken: String, refreshToken: String, instanceUrl: String)
 
-case class UnauthorizedError(message: String) extends Exception {
-  override def getMessage: String = message
-}
-
-case class RequestError(message: String) extends Exception {
-  override def getMessage: String = message
-}
 
 class RichFutureWSResponse(val future: Future[WSResponse]) extends AnyVal {
 

@@ -1,0 +1,9 @@
+CREATE TABLE repo (
+  id SERIAL PRIMARY KEY,
+  github_id BIGINT NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  full_name VARCHAR(1024) NOT NULL,
+  description TEXT NOT NULL,
+  html_url VARCHAR(1024) NOT NULL,
+  owner_id VARCHAR(1024) REFERENCES owner(id) NOT NULL
+);
