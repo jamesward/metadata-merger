@@ -41,7 +41,7 @@ require([
 
       $scope.hasData = function(data) {
         if (angular.isObject(data)) {
-          return Object.keys(data).length;
+          return Object.keys(data).length !== 0;
         }
         else {
           return false;
