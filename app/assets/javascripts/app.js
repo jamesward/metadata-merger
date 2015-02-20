@@ -285,7 +285,7 @@ require([
           .post(url, { apexClasses: apexClasses })
           .success(function(data, status, headers, config) {
             $scope.diffData = {};
-            $scope.fetchRemoteData($scope.selectedRemotes[1], function(data) {
+            fetchRemoteData($scope.selectedRemotes[1], function(data) {
               data.org = $scope.toRemoteData.org;
               data.repo = $scope.toRemoteData.repo;
               $scope.toRemoteData = data;
@@ -295,10 +295,6 @@ require([
             console.log(error);
             // todo
           });
-      };
-
-      $scope.syncToGitHub = function() {
-
       };
 
       function getGitHubReadyStatus() {
@@ -334,6 +330,8 @@ require([
         $http
           .post("/repos", repo)
           .success(function(data) {
+            // remove the repos
+            $scope.remotes = $scope.remotes.filter(function(item) { return !item.repo; });
             fetchRepos();
           })
           .error(function(error) {

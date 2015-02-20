@@ -278,21 +278,20 @@ object Application extends Controller {
     maybeApexUpdates(request.body).fold(Future.successful(BadRequest(""))) { apexUpdates =>
       // todo: refresh handler
 
-      println(apexUpdates)
-
       Owner.find(request.ownerId).flatMap { owner =>
         Repo.find(repoId, request.ownerId).flatMap { repo =>
           owner.githubAccessToken.fold(Future.successful(BadRequest("No GitHub Account"))) { githubAccessToken =>
 
-            val createsFutures = apexUpdates.creates.map { case (name, body) =>
-              githubUtil.createApexClass(repo.fullName, name, body, githubAccessToken)
-            }
-            val updatesFutures = githubUtil.updateApexClasses(repo.fullName, apexUpdates.updates, githubAccessToken)
-            val deletesFutures = apexUpdates.deletes.map { name =>
-              githubUtil.deleteApexClass(repo.fullName, name, githubAccessToken)
-            }
+            // we have to do these sequentially because:
+            // https://stackoverflow.com/questions/19576601/github-api-issue-with-file-upload
 
-            Future.sequence(createsFutures ++ Seq(updatesFutures) ++ deletesFutures).map { _ =>
+            val f = for {
+              _ <- githubUtil.createApexClasses(repo.fullName, apexUpdates.creates, githubAccessToken)
+              _ <- githubUtil.updateApexClasses(repo.fullName, apexUpdates.updates, githubAccessToken)
+              _ <- githubUtil.deleteApexClasses(repo.fullName, apexUpdates.deletes, githubAccessToken)
+            } yield Unit
+
+            f.map { _ =>
               Ok(EmptyContent())
             } recover {
               case e: Exception =>

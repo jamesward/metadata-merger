@@ -179,21 +179,30 @@ class GithubUtil(implicit app: Application) {
     }
   }
 
+  // we have to do these sequentially because:
+  // https://stackoverflow.com/questions/19576601/github-api-issue-with-file-upload
+
+  def createApexClasses(fullName: String, classes: Map[String, String], accessToken: String): Future[Iterable[JsValue]] = {
+    seqFutures(classes) { case (name, body) =>
+      createApexClass(fullName, name, body, accessToken)
+    }
+  }
+
   def updateApexClasses(fullName: String, classes: Map[String, String], accessToken: String): Future[Iterable[JsValue]] = {
-    println(classes)
-    Future.sequence {
-      classes.map { case(name, body) =>
-        updateApexClass(fullName, name, body, accessToken)
-      }
+    seqFutures(classes) { case (name, body) =>
+      updateApexClass(fullName, name, body, accessToken)
+    }
+  }
+
+  def deleteApexClasses(fullName: String, classes: Seq[String], accessToken: String): Future[Iterable[JsValue]] = {
+    seqFutures(classes) { name =>
+      deleteApexClass(fullName, name, accessToken)
     }
   }
 
   def updateApexClass(fullName: String, name: String, body: String, accessToken: String): Future[JsValue] = {
-    println(fullName, name, body)
     apexClass(fullName, name, accessToken).flatMap { apexClassJson =>
       val sha = (apexClassJson \ "sha").as[String]
-
-      println(apexClassJson)
 
       val json = Json.obj(
         "path" -> apexClassPath(name),
@@ -232,6 +241,14 @@ class GithubUtil(implicit app: Application) {
         }
       }
     }
+  }
+
+  def seqFutures[T, U](items: TraversableOnce[T])(f: T => Future[U]): Future[List[U]] = {
+    items.foldLeft(Future.successful[List[U]](Nil)) {
+      (futures, item) => futures.flatMap { values =>
+        f(item).map(_ :: values)
+      }
+    } map (_.reverse)
   }
 
 }
